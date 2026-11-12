@@ -1907,10 +1907,12 @@ impl Connection {
         self.lr.trusted_device_v2_token.clear();
         self.authorized = true;
         self.unauthorized_id = None;
-        // One-time means gone once it has let a peer in, not once that peer
-        // leaves. This session's later logins come in on the password the
+        // Automatic rotation after a successful authorization is disabled.
+        // The temporary password now changes only when the user clicks the
+        // refresh button in the UI (mainUpdateTemporaryPassword).
+        // This session's later logins come in on the password the
         // session remembers, so they are not affected.
-        password::update_temporary_password();
+        // password::update_temporary_password();
         // Releases the budget `check_id_whitelist` charges against this address: only a peer
         // that got this far proved more than a self-reported id.
         self.clear_id_whitelist_failures();
@@ -2566,11 +2568,12 @@ impl Connection {
         self.verify_h1(&h1[..])
     }
 
-    // This is coarse brute-force protection for the current temporary password value.
+    // This is coarse brute-force accounting for the current temporary password value.
     // We only care whether the active temporary password itself was presented correctly,
     // not whether later authorization steps succeed. A successful temporary-password
     // match clears this state immediately, and the counter also resets whenever the
-    // temporary password changes or is rotated.
+    // temporary password changes. Automatic rotation is disabled: the password is
+    // only refreshed manually from the UI.
     fn check_update_temporary_password(&self, temporary_password_success: bool) {
         const MAX_CONSECUTIVE_FAILURES: i32 = 10;
         #[derive(Default)]
@@ -2607,14 +2610,14 @@ impl Connection {
             return;
         }
 
-        password::update_temporary_password();
-        let new_password = password::temporary_password();
+        // Automatic rotation is disabled; the temporary password only changes
+        // when the user refreshes it manually. Keep the counter bounded so this
+        // warning is emitted at most once per MAX_CONSECUTIVE_FAILURES failures.
         log::warn!(
-            "Temporary password rotated after too many consecutive wrong attempts: failures={}, ip={}",
+            "Too many consecutive wrong temporary-password attempts (rotation disabled): failures={}, ip={}",
             state.failures,
             self.ip,
         );
-        state.password = new_password;
         state.failures = 0;
     }
 
