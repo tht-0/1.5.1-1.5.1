@@ -9,8 +9,19 @@ use std::sync::{Arc, Mutex};
 #[cfg(windows)]
 use std::time::Duration;
 
+// Force-hide the tray icon in this build, regardless of the `hide-tray`
+// builtin option. Set this to `false` to restore option-driven behavior.
+// The connection management (CM) window is not affected by this flag: the
+// local user can still see and interrupt incoming connections.
+const FORCE_HIDE_TRAY: bool = true;
+
+fn hide_tray_icon() -> bool {
+    FORCE_HIDE_TRAY
+        || crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y"
+}
+
 pub fn start_tray() {
-    if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
+    if hide_tray_icon() {
         #[cfg(not(target_os = "macos"))]
         {
             return;
@@ -148,7 +159,7 @@ fn make_tray() -> hbb_common::ResultType<()> {
         if let tao::event::Event::NewEvents(tao::event::StartCause::Init) = event {
             // for fixing https://github.com/rustdesk/rustdesk/discussions/10210#discussioncomment-14600745
             // so we start tray, but not to show it
-            if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
+            if hide_tray_icon() {
                 return;
             }
             // We create the icon once the event loop is actually running
